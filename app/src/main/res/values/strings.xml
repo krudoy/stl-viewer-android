@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">STL Viewer</string>
+    <string name="open">Open</string>
+    <string name="reset_view">Reset</string>
+    <string name="loading">Loading…</string>
+    <string name="empty_hint">Tap Open to choose an STL file.\n\nDrag to rotate, pinch to zoom, drag with two fingers to pan, double tap to reset.</string>
+    <string name="mesh_info">%1$s triangles · %2$s</string>
+    <string name="error_open">Could not open the file</string>
+    <string name="error_parse">Could not read this file: %1$s</string>
+    <string name="error_memory">This model is too large for the memory available on this device.</string>
+</resources>
