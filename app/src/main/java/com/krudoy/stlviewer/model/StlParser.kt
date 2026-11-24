@@ -149,7 +149,7 @@ object StlParser {
     }
 
     /** Writes the normal of the triangle at [p] (index into positions) to all three of its vertices. */
-    private fun computeFaceNormal(pos: FloatArray, nrm: FloatArray, p: Int) {
+    internal fun computeFaceNormal(pos: FloatArray, nrm: FloatArray, p: Int) {
         val ax = pos[p + 3] - pos[p]; val ay = pos[p + 4] - pos[p + 1]; val az = pos[p + 5] - pos[p + 2]
         val bx = pos[p + 6] - pos[p]; val by = pos[p + 7] - pos[p + 1]; val bz = pos[p + 8] - pos[p + 2]
         var nx = ay * bz - az * by

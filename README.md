@@ -1,6 +1,6 @@
 # STL Viewer for Android
 
-A lightweight Android app for previewing 3D model files. STL (binary and ASCII) works today; STEP is planned.
+A lightweight Android app for previewing 3D model files: STL (binary and ASCII) and 3MF, including multi-part 3MF projects from Bambu Studio, PrusaSlicer and Orca. STEP is in progress.
 
 ## Using it
 
@@ -30,6 +30,8 @@ Requires JDK 17+ and the Android SDK (Android Studio sets both up).
 
 ## Layout
 
+- `model/ModelLoader.kt`: detects the format from the first bytes and picks a parser.
+- `model/ThreeMfParser.kt`: 3MF reader (core spec plus the production extension's `p:path` components), applies build and component transforms, converts units to mm.
 - `model/StlParser.kt`: binary and ASCII STL reader. Detects the format by file size rather than the `solid` header, and recomputes normals from vertex winding.
 - `render/Camera.kt`: orbit camera with trackball rotation, pan and focus-point zoom.
 - `render/OrientationCube.kt`: the corner navigation cube, drawing and tap picking.
