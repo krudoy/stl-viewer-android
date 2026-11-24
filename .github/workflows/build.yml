@@ -6,9 +6,14 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  NDK_VERSION: 27.2.12479018
+  CMAKE_VERSION: 3.22.1
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -19,11 +24,36 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Install NDK and CMake
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" "cmake;$CMAKE_VERSION" > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+          echo "$ANDROID_HOME/cmake/$CMAKE_VERSION/bin" >> "$GITHUB_PATH"
+
+      # Open CASCADE (for STEP) takes a while to compile, so the built libraries are cached.
+      - name: Cache OCCT
+        id: occt-cache
+        uses: actions/cache@v4
+        with:
+          path: third_party/occt
+          key: occt-${{ hashFiles('scripts/build-occt.sh') }}-ndk${{ env.NDK_VERSION }}-arm64-x86_64
+
+      - name: Build OCCT
+        if: steps.occt-cache.outputs.cache-hit != 'true'
+        run: |
+          scripts/build-occt.sh arm64-v8a
+          scripts/build-occt.sh x86_64
+
       - name: Unit tests
         run: ./gradlew --no-daemon testDebugUnitTest
 
       - name: Build debug APK
         run: ./gradlew --no-daemon assembleDebug lintDebug
+
+      - name: Check STEP support is in the APK
+        run: |
+          unzip -l app/build/outputs/apk/debug/*.apk | grep -E 'lib/(arm64-v8a|x86_64)/libstepmesh.so'
+          ls -la app/build/intermediates/merged_native_libs/debug/*/out/lib/*/ || true
 
       - uses: actions/upload-artifact@v4
         with:

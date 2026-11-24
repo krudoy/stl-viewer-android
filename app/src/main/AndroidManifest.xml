@@ -35,6 +35,10 @@
                 <data android:mimeType="application/vnd.ms-pki.stl" />
                 <data android:mimeType="application/x-navistyle" />
                 <data android:mimeType="model/3mf" />
+                <data android:mimeType="model/step" />
+                <data android:mimeType="application/step" />
+                <data android:mimeType="application/stp" />
+                <data android:mimeType="application/x-step" />
                 <data android:mimeType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml" />
                 <data android:mimeType="application/octet-stream" />
             </intent-filter>
