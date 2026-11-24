@@ -11,4 +11,5 @@
     <string name="error_open">Could not open the file</string>
     <string name="error_parse">Could not read this file: %1$s</string>
     <string name="error_memory">This model is too large for the memory available on this device.</string>
+    <string name="picker_hint">The picker shows 3D model files only. Long-press Open to see all files.</string>
 </resources>

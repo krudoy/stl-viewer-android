@@ -192,8 +192,10 @@ class MainActivity : ComponentActivity() {
         topBar.addView(titleView, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
         topBar.addView(pillButton(getString(R.string.reset_view)) { modelView.resetView() },
             LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { marginEnd = (8 * dp).toInt() })
-        topBar.addView(pillButton(getString(R.string.open)) { openDocument.launch(arrayOf("*/*")) },
-            LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
+        topBar.addView(pillButton(getString(R.string.open)) { openModelPicker() }.apply {
+            // Long press shows every file, for providers that label models with odd types.
+            setOnLongClickListener { openDocument.launch(arrayOf("*/*")); true }
+        }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
         root.addView(topBar, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.TOP))
         // Keep the orientation cube just below the top bar and clear of side insets.
         // 90° spin buttons, centered under the orientation cube.
@@ -241,12 +243,12 @@ class MainActivity : ComponentActivity() {
         root.addView(info, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.BOTTOM))
 
         hint = TextView(this).apply {
-            text = getString(R.string.empty_hint)
+            text = getString(R.string.empty_hint) + "\n\n" + getString(R.string.picker_hint)
             setTextColor(0xCCFFFFFF.toInt())
             textSize = 16f
             gravity = Gravity.CENTER
             setPadding((32 * dp).toInt(), 0, (32 * dp).toInt(), 0)
-            setOnClickListener { openDocument.launch(arrayOf("*/*")) }
+            setOnClickListener { openModelPicker() }
         }
         root.addView(hint, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.CENTER))
 
@@ -268,7 +270,27 @@ class MainActivity : ComponentActivity() {
         return root
     }
 
+    private fun openModelPicker() = openDocument.launch(MODEL_MIME_TYPES)
+
     private companion object {
         const val KEY_URI = "uri"
+
+        /**
+         * What the file picker shows. Android has no single registered type for these
+         * formats, so this lists the ones apps and file providers use. Most providers
+         * report unknown extensions (often .stl and .step) as octet-stream, so that is
+         * included too; it still hides photos, videos, PDFs and documents.
+         */
+        val MODEL_MIME_TYPES = arrayOf(
+            // STL
+            "model/stl", "model/x.stl-binary", "model/x.stl-ascii", "application/sla",
+            "application/vnd.ms-pki.stl", "application/x-navistyle",
+            // 3MF
+            "model/3mf", "application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
+            // STEP
+            "model/step", "model/x-step", "application/step", "application/stp", "application/x-step",
+            // Unlabeled binary files
+            "application/octet-stream",
+        )
     }
 }
