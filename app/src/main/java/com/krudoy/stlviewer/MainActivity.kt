@@ -24,12 +24,13 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
 import com.krudoy.stlviewer.model.Mesh
-import com.krudoy.stlviewer.model.StlParser
+import com.krudoy.stlviewer.model.ModelLoader
 import com.krudoy.stlviewer.render.ModelView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -94,7 +95,7 @@ class MainActivity : ComponentActivity() {
                     val stream = contentResolver.openInputStream(uri)
                         ?: error(getString(R.string.error_open))
                     stream.use { s ->
-                        StlParser.parse(s, length) { f ->
+                        ModelLoader.load(s, length, File(cacheDir, "import.tmp")) { f ->
                             progress.post {
                                 progress.isIndeterminate = false
                                 progress.progress = (f * 100).toInt()
