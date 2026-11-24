@@ -14,7 +14,9 @@ import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
@@ -39,7 +41,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var modelView: ModelView
     private lateinit var titleView: TextView
     private lateinit var info: TextView
-    private lateinit var hint: TextView
+    private lateinit var hint: View
+    private lateinit var recentList: LinearLayout
+    private lateinit var recentFiles: RecentFiles
     private lateinit var progress: ProgressBar
     private lateinit var rollButtons: View
     private var loadJob: Job? = null
@@ -56,6 +60,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        recentFiles = RecentFiles(this)
         setContentView(buildLayout())
 
         val restored = savedInstanceState?.getString(KEY_URI)?.let(Uri::parse)
@@ -107,6 +112,7 @@ class MainActivity : ComponentActivity() {
             progress.visibility = View.GONE
             result.onSuccess { mesh ->
                 currentUri = uri
+                recentFiles.add(uri, name ?: uri.lastPathSegment ?: getString(R.string.app_name))
                 modelView.setMesh(mesh)
                 rollButtons.visibility = View.VISIBLE
                 info.text = describe(mesh)
@@ -116,7 +122,9 @@ class MainActivity : ComponentActivity() {
                 } else {
                     info.text = getString(R.string.error_parse, e.message ?: e.javaClass.simpleName)
                 }
-                if (currentUri == null) hint.visibility = View.VISIBLE
+                // A recent file that was moved or deleted: stop offering it.
+                if (e is java.io.FileNotFoundException || e is SecurityException) recentFiles.remove(uri)
+                if (currentUri == null) showStartPanel()
             }
         }
     }
@@ -124,7 +132,55 @@ class MainActivity : ComponentActivity() {
     private fun showEmpty() {
         titleView.text = getString(R.string.app_name)
         info.text = ""
+        showStartPanel()
+    }
+
+    private fun showStartPanel() {
+        refreshRecentList()
         hint.visibility = View.VISIBLE
+    }
+
+    /** Rebuilds the "Recent" rows on the start screen. */
+    private fun refreshRecentList() {
+        val dp = resources.displayMetrics.density
+        recentList.removeAllViews()
+        val entries = recentFiles.list()
+        if (entries.isEmpty()) return
+        recentList.addView(TextView(this).apply {
+            text = getString(R.string.recent)
+            setTextColor(0x99FFFFFF.toInt())
+            textSize = 13f
+            isAllCaps = true
+            setPadding(0, (24 * dp).toInt(), 0, (6 * dp).toInt())
+        })
+        for (entry in entries) {
+            recentList.addView(TextView(this).apply {
+                text = entry.name
+                setTextColor(Color.WHITE)
+                textSize = 16f
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.MIDDLE
+                gravity = Gravity.CENTER
+                setPadding((16 * dp).toInt(), (10 * dp).toInt(), (16 * dp).toInt(), (10 * dp).toInt())
+                val shape = GradientDrawable().apply { cornerRadius = 12 * dp; setColor(0x1AFFFFFF) }
+                background = RippleDrawable(ColorStateList.valueOf(0x40FFFFFF), shape, null)
+                isClickable = true
+                setOnClickListener { load(entry.uri) }
+            }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = (6 * dp).toInt() })
+        }
+    }
+
+    /** Title tap: quick switch between recent files without the system picker. */
+    private fun showRecentMenu(anchor: View) {
+        val menu = PopupMenu(this, anchor)
+        val entries = recentFiles.list().filter { it.uri != currentUri }
+        entries.forEachIndexed { i, e -> menu.menu.add(0, i, i, e.name) }
+        menu.menu.add(0, OPEN_ITEM, entries.size, getString(R.string.open_other))
+        menu.setOnMenuItemClickListener { item ->
+            if (item.itemId == OPEN_ITEM) openModelPicker() else load(entries[item.itemId].uri)
+            true
+        }
+        menu.show()
     }
 
     private fun describe(mesh: Mesh): String {
@@ -188,6 +244,8 @@ class MainActivity : ComponentActivity() {
             textSize = 17f
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.MIDDLE
+            // Tap the file name to switch to a recent file.
+            setOnClickListener { v -> showRecentMenu(v) }
         }
         topBar.addView(titleView, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
         topBar.addView(pillButton(getString(R.string.reset_view)) { modelView.resetView() },
@@ -242,15 +300,29 @@ class MainActivity : ComponentActivity() {
         }
         root.addView(info, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.BOTTOM))
 
-        hint = TextView(this).apply {
+        // Start screen: how-to text, then recently opened files.
+        val hintText = TextView(this).apply {
             text = getString(R.string.empty_hint) + "\n\n" + getString(R.string.picker_hint)
             setTextColor(0xCCFFFFFF.toInt())
             textSize = 16f
             gravity = Gravity.CENTER
-            setPadding((32 * dp).toInt(), 0, (32 * dp).toInt(), 0)
             setOnClickListener { openModelPicker() }
         }
-        root.addView(hint, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.CENTER))
+        recentList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((32 * dp).toInt(), (96 * dp).toInt(), (32 * dp).toInt(), (72 * dp).toInt())
+            addView(hintText, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+            addView(recentList, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        }
+        hint = ScrollView(this).apply {
+            isFillViewport = true
+            addView(FrameLayout(this@MainActivity).apply {
+                addView(panel, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.CENTER))
+            }, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        }
+        // Right above the 3D view, so the top bar and its buttons stay on top and tappable.
+        root.addView(hint, 1, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
 
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 100
@@ -274,6 +346,7 @@ class MainActivity : ComponentActivity() {
 
     private companion object {
         const val KEY_URI = "uri"
+        const val OPEN_ITEM = 1000
 
         /**
          * What the file picker shows. Android has no single registered type for these
