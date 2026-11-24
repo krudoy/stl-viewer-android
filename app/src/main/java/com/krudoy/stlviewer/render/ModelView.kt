@@ -14,11 +14,17 @@ import com.krudoy.stlviewer.model.Mesh
  * - two finger drag: pan
  * - pinch: zoom toward the fingers
  * - double tap: reset the view
+ * - tap the orientation cube: look from that face, edge or corner
  */
 class ModelView(context: Context) : GLSurfaceView(context) {
 
     val camera = Camera()
-    private val renderer = ModelRenderer(camera)
+    private val cube = OrientationCube(camera)
+    private val renderer = ModelRenderer(camera, cube) { requestRender() }
+
+    private val density = resources.displayMetrics.density
+    private var cubeTopInset = 0
+    private var cubeRightInset = 0
 
     private enum class Mode { NONE, ROTATE, PAN }
     private var mode = Mode.NONE
@@ -35,7 +41,15 @@ class ModelView(context: Context) : GLSurfaceView(context) {
         }).apply { isQuickScaleEnabled = false }
 
     private val tapDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+        override fun onSingleTapUp(e: MotionEvent): Boolean {
+            val region = cube.pick(e.x, e.y) ?: return false
+            camera.snapToDirection(region[0].toFloat(), region[1].toFloat(), region[2].toFloat())
+            requestRender()
+            return true
+        }
+
         override fun onDoubleTap(e: MotionEvent): Boolean {
+            if (cube.contains(e.x, e.y)) return false
             resetView()
             return true
         }
@@ -51,13 +65,34 @@ class ModelView(context: Context) : GLSurfaceView(context) {
 
     fun setMesh(mesh: Mesh?) {
         renderer.setMesh(mesh)
-        camera.reset()
+        cube.visible = mesh != null
+        camera.reset(animate = false)
         requestRender()
     }
 
     fun resetView() {
-        camera.reset()
+        camera.reset(animate = true)
         requestRender()
+    }
+
+    /** Space taken by overlays at the top and right, so the cube sits just below the top bar. */
+    fun setCubeInsets(top: Int, right: Int) {
+        cubeTopInset = top; cubeRightInset = right
+        layoutCube(width)
+        requestRender()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        layoutCube(w)
+    }
+
+    private fun layoutCube(viewWidth: Int) {
+        val size = CUBE_SIZE_DP * density
+        val margin = 12 * density
+        cube.size = size
+        cube.left = viewWidth - cubeRightInset - margin - size
+        cube.top = cubeTopInset + margin
     }
 
     /** Scroll-wheel zoom for emulators, Chromebooks and mice. */
@@ -82,16 +117,24 @@ class ModelView(context: Context) : GLSurfaceView(context) {
             MotionEvent.ACTION_DOWN -> {
                 mode = Mode.ROTATE
                 lastX = e.x; lastY = e.y
+                downX = e.x; downY = e.y
+                setHighlight(cube.pick(e.x, e.y))
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
+                setHighlight(null)
                 mode = Mode.PAN
                 lastX = centroidX(e, -1); lastY = centroidY(e, -1)
             }
             MotionEvent.ACTION_MOVE -> when (mode) {
                 Mode.ROTATE -> if (e.pointerCount == 1) {
-                    camera.rotateBy(e.x - lastX, e.y - lastY)
+                    val moved = Math.hypot((e.x - downX).toDouble(), (e.y - downY).toDouble()) > touchSlop
+                    // A press on the cube stays a tap until the finger really moves.
+                    if (cubeHighlighted && moved) setHighlight(null)
+                    if (!cubeHighlighted) {
+                        camera.rotateBy(e.x - lastX, e.y - lastY)
+                        requestRender()
+                    }
                     lastX = e.x; lastY = e.y
-                    requestRender()
                 }
                 Mode.PAN -> if (e.pointerCount >= 2) {
                     val cx = centroidX(e, -1); val cy = centroidY(e, -1)
@@ -110,9 +153,23 @@ class ModelView(context: Context) : GLSurfaceView(context) {
                     mode = Mode.NONE
                 }
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> mode = Mode.NONE
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                mode = Mode.NONE
+                setHighlight(null)
+            }
         }
         return true
+    }
+
+    private var downX = 0f
+    private var downY = 0f
+    private var cubeHighlighted = false
+    private val touchSlop = android.view.ViewConfiguration.get(context).scaledTouchSlop
+
+    private fun setHighlight(region: IntArray?) {
+        cube.highlight = region
+        cubeHighlighted = region != null
+        requestRender()
     }
 
     private fun centroidX(e: MotionEvent, skip: Int): Float {
@@ -125,5 +182,9 @@ class ModelView(context: Context) : GLSurfaceView(context) {
         var sum = 0f; var n = 0
         for (i in 0 until e.pointerCount) if (i != skip) { sum += e.getY(i); n++ }
         return if (n > 0) sum / n else e.y
+    }
+
+    private companion object {
+        const val CUBE_SIZE_DP = 96
     }
 }

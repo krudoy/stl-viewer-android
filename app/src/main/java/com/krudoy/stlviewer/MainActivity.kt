@@ -1,8 +1,10 @@
 package com.krudoy.stlviewer
 
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -10,7 +12,6 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -157,7 +158,21 @@ class MainActivity : ComponentActivity() {
         modelView = ModelView(this)
         root.addView(modelView, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
 
-        val pill = { GradientDrawable().apply { cornerRadius = 20 * dp; setColor(0x33FFFFFF) } }
+        // Plain text views as pill buttons: Button's built-in min height and padding
+        // clip the label inside a compact bar on some devices.
+        fun pillButton(label: String, onClick: () -> Unit) = TextView(this).apply {
+            text = label
+            setTextColor(Color.WHITE)
+            textSize = 15f
+            gravity = Gravity.CENTER
+            setPadding((16 * dp).toInt(), (8 * dp).toInt(), (16 * dp).toInt(), (8 * dp).toInt())
+            minWidth = (64 * dp).toInt()
+            val shape = GradientDrawable().apply { cornerRadius = 20 * dp; setColor(0x33FFFFFF) }
+            background = RippleDrawable(ColorStateList.valueOf(0x55FFFFFF), shape, null)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { onClick() }
+        }
 
         val topBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -172,25 +187,15 @@ class MainActivity : ComponentActivity() {
             ellipsize = android.text.TextUtils.TruncateAt.MIDDLE
         }
         topBar.addView(titleView, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
-        val resetButton = Button(this).apply {
-            text = getString(R.string.reset_view)
-            setTextColor(Color.WHITE)
-            background = pill()
-            isAllCaps = false
-            setOnClickListener { modelView.resetView() }
-        }
-        topBar.addView(resetButton, LinearLayout.LayoutParams(WRAP_CONTENT, (40 * dp).toInt()).apply {
-            marginEnd = (8 * dp).toInt()
-        })
-        val openButton = Button(this).apply {
-            text = getString(R.string.open)
-            setTextColor(Color.WHITE)
-            background = pill()
-            isAllCaps = false
-            setOnClickListener { openDocument.launch(arrayOf("*/*")) }
-        }
-        topBar.addView(openButton, LinearLayout.LayoutParams(WRAP_CONTENT, (40 * dp).toInt()))
+        topBar.addView(pillButton(getString(R.string.reset_view)) { modelView.resetView() },
+            LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { marginEnd = (8 * dp).toInt() })
+        topBar.addView(pillButton(getString(R.string.open)) { openDocument.launch(arrayOf("*/*")) },
+            LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
         root.addView(topBar, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.TOP))
+        // Keep the orientation cube just below the top bar and clear of side insets.
+        topBar.addOnLayoutChangeListener { v, _, _, _, bottom, _, _, _, _ ->
+            modelView.setCubeInsets(bottom, v.paddingRight - (12 * dp).toInt())
+        }
 
         info = TextView(this).apply {
             setTextColor(0xDDFFFFFF.toInt())

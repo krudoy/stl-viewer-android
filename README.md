@@ -9,6 +9,7 @@ A lightweight Android app for previewing 3D model files. STL (binary and ASCII) 
 - **Pinch** zooms toward your fingers.
 - **Two finger drag** pans.
 - **Double tap** or **Reset** returns to the default view.
+- **Orientation cube** (top right) turns with the model. Tap a face, edge or corner to look from that direction; faces are named Front (-Y), Back, Left, Right (+X), Top (+Z) and Bottom.
 - A mouse wheel zooms too (emulator, Chromebook, DeX).
 
 `samples/torus.stl` is a small file for trying it out.
@@ -30,6 +31,7 @@ Requires JDK 17+ and the Android SDK (Android Studio sets both up).
 
 - `model/StlParser.kt`: binary and ASCII STL reader. Detects the format by file size rather than the `solid` header, and recomputes normals from vertex winding.
 - `render/Camera.kt`: orbit camera with trackball rotation, pan and focus-point zoom.
+- `render/OrientationCube.kt`: the corner navigation cube, drawing and tap picking.
 - `render/ModelRenderer.kt`: OpenGL ES 2.0 renderer, two-sided shading.
 - `render/ModelView.kt`: `GLSurfaceView` that turns touch gestures into camera moves.
 - `MainActivity.kt`: file picker, background loading, and the overlay UI.

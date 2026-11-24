@@ -11,7 +11,15 @@ import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 /** Draws one mesh with simple two-sided Blinn-Phong shading and a camera-mounted light. */
-class ModelRenderer(private val camera: Camera) : GLSurfaceView.Renderer {
+class ModelRenderer(
+    private val camera: Camera,
+    private val cube: OrientationCube,
+    /** Asks the view for another frame (used while a view animation runs). */
+    private val requestFrame: () -> Unit,
+) : GLSurfaceView.Renderer {
+
+    private var viewWidth = 1
+    private var viewHeight = 1
 
     @Volatile private var pendingMesh: Mesh? = null
     private var mesh: Mesh? = null
@@ -56,6 +64,7 @@ class ModelRenderer(private val camera: Camera) : GLSurfaceView.Renderer {
 
         bgProgram = buildProgram(BG_VS, BG_FS)
         bgPosition = GLES20.glGetAttribLocation(bgProgram, "aPosition")
+        cube.onSurfaceCreated()
 
         // A new context means old buffers are gone: re-upload whatever we were showing.
         GLES20.glGenBuffers(2, vbo, 0)
@@ -66,6 +75,7 @@ class ModelRenderer(private val camera: Camera) : GLSurfaceView.Renderer {
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES20.glViewport(0, 0, width, height)
+        viewWidth = width; viewHeight = height
         camera.setViewport(width, height)
     }
 
@@ -76,10 +86,15 @@ class ModelRenderer(private val camera: Camera) : GLSurfaceView.Renderer {
             pendingMesh = null
             upload(mesh)
         }
+        if (camera.tick()) requestFrame()
 
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
         drawBackground()
+        drawMesh()
+        cube.draw(viewWidth, viewHeight)
+    }
 
+    private fun drawMesh() {
         val m = mesh ?: return
         if (uploadedVertices == 0) return
 
@@ -146,33 +161,33 @@ class ModelRenderer(private val camera: Camera) : GLSurfaceView.Renderer {
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
     }
 
-    private fun buildProgram(vs: String, fs: String): Int {
-        val v = compile(GLES20.GL_VERTEX_SHADER, vs)
-        val f = compile(GLES20.GL_FRAGMENT_SHADER, fs)
-        val p = GLES20.glCreateProgram()
-        GLES20.glAttachShader(p, v)
-        GLES20.glAttachShader(p, f)
-        GLES20.glLinkProgram(p)
-        val ok = IntArray(1)
-        GLES20.glGetProgramiv(p, GLES20.GL_LINK_STATUS, ok, 0)
-        if (ok[0] == 0) Log.e(TAG, "Link failed: " + GLES20.glGetProgramInfoLog(p))
-        GLES20.glDeleteShader(v)
-        GLES20.glDeleteShader(f)
-        return p
-    }
+    companion object {
+        private const val TAG = "ModelRenderer"
 
-    private fun compile(type: Int, src: String): Int {
-        val s = GLES20.glCreateShader(type)
-        GLES20.glShaderSource(s, src)
-        GLES20.glCompileShader(s)
-        val ok = IntArray(1)
-        GLES20.glGetShaderiv(s, GLES20.GL_COMPILE_STATUS, ok, 0)
-        if (ok[0] == 0) Log.e(TAG, "Compile failed: " + GLES20.glGetShaderInfoLog(s))
-        return s
-    }
+        fun buildProgram(vs: String, fs: String): Int {
+            val v = compile(GLES20.GL_VERTEX_SHADER, vs)
+            val f = compile(GLES20.GL_FRAGMENT_SHADER, fs)
+            val p = GLES20.glCreateProgram()
+            GLES20.glAttachShader(p, v)
+            GLES20.glAttachShader(p, f)
+            GLES20.glLinkProgram(p)
+            val ok = IntArray(1)
+            GLES20.glGetProgramiv(p, GLES20.GL_LINK_STATUS, ok, 0)
+            if (ok[0] == 0) Log.e(TAG, "Link failed: " + GLES20.glGetProgramInfoLog(p))
+            GLES20.glDeleteShader(v)
+            GLES20.glDeleteShader(f)
+            return p
+        }
 
-    private companion object {
-        const val TAG = "ModelRenderer"
+        private fun compile(type: Int, src: String): Int {
+            val s = GLES20.glCreateShader(type)
+            GLES20.glShaderSource(s, src)
+            GLES20.glCompileShader(s)
+            val ok = IntArray(1)
+            GLES20.glGetShaderiv(s, GLES20.GL_COMPILE_STATUS, ok, 0)
+            if (ok[0] == 0) Log.e(TAG, "Compile failed: " + GLES20.glGetShaderInfoLog(s))
+            return s
+        }
 
         const val MESH_VS = """
             uniform mat4 uMvp;
