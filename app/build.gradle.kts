@@ -13,6 +13,27 @@ android {
         targetSdk = 35
         versionCode = 2
         versionName = "0.2.0"
+
+        ndk {
+            // 64-bit ARM phones, plus x86_64 for emulators and Chromebooks.
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
+        externalNativeBuild {
+            cmake {
+                arguments += listOf("-DANDROID_STL=c++_static")
+                cppFlags += listOf("-fexceptions", "-frtti")
+            }
+        }
+    }
+
+    // Must match the NDK used by scripts/build-occt.sh (see .github/workflows/build.yml).
+    ndkVersion = "27.2.12479018"
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     buildTypes {
