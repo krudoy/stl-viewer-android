@@ -2,9 +2,11 @@
 <resources>
     <string name="app_name">STL Viewer</string>
     <string name="open">Open</string>
+    <string name="rotate_left">Rotate 90° counter-clockwise</string>
+    <string name="rotate_right">Rotate 90° clockwise</string>
     <string name="reset_view">Reset</string>
     <string name="loading">Loading…</string>
-    <string name="empty_hint">Tap Open to choose an STL file.\n\nDrag to rotate, pinch to zoom, drag with two fingers to pan, double tap to reset. Tap the cube in the corner to jump to a view.</string>
+    <string name="empty_hint">Tap Open to choose an STL file.\n\nDrag to rotate, pinch to zoom, drag with two fingers to pan, twist two fingers to spin, double tap to reset. Tap the cube in the corner to jump to a view.</string>
     <string name="mesh_info">%1$s triangles · %2$s</string>
     <string name="error_open">Could not open the file</string>
     <string name="error_parse">Could not read this file: %1$s</string>

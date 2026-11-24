@@ -7,12 +7,15 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import com.krudoy.stlviewer.model.Mesh
+import kotlin.math.abs
+import kotlin.math.atan2
 
 /**
  * GL view with touch navigation:
  * - one finger drag: rotate
  * - two finger drag: pan
  * - pinch: zoom toward the fingers
+ * - two finger twist: spin the model in the screen plane
  * - double tap: reset the view
  * - tap the orientation cube: look from that face, edge or corner
  */
@@ -70,6 +73,12 @@ class ModelView(context: Context) : GLSurfaceView(context) {
         requestRender()
     }
 
+    /** Spins the model by [degrees] in the screen plane, counter-clockwise when positive. */
+    fun roll(degrees: Float) {
+        camera.rollAnimated(degrees)
+        requestRender()
+    }
+
     fun resetView() {
         camera.reset(animate = true)
         requestRender()
@@ -124,6 +133,9 @@ class ModelView(context: Context) : GLSurfaceView(context) {
                 setHighlight(null)
                 mode = Mode.PAN
                 lastX = centroidX(e, -1); lastY = centroidY(e, -1)
+                lastAngle = twistAngle(e, -1)
+                twistPending = 0f
+                twisting = false
             }
             MotionEvent.ACTION_MOVE -> when (mode) {
                 Mode.ROTATE -> if (e.pointerCount == 1) {
@@ -140,6 +152,19 @@ class ModelView(context: Context) : GLSurfaceView(context) {
                     val cx = centroidX(e, -1); val cy = centroidY(e, -1)
                     camera.panBy(cx - lastX, cy - lastY)
                     lastX = cx; lastY = cy
+                    val angle = twistAngle(e, -1)
+                    val d = wrapDegrees(angle - lastAngle)
+                    lastAngle = angle
+                    if (twisting) {
+                        camera.rollAt(-d, cx, cy)
+                    } else {
+                        // Ignore small twists so pinching and panning stay steady.
+                        twistPending += d
+                        if (abs(twistPending) > TWIST_START_DEGREES) {
+                            twisting = true
+                            camera.rollAt(-twistPending, cx, cy)
+                        }
+                    }
                     requestRender()
                 }
                 Mode.NONE -> Unit
@@ -148,6 +173,7 @@ class ModelView(context: Context) : GLSurfaceView(context) {
                 if (e.pointerCount - 1 >= 2) {
                     // Still panning with the remaining fingers; re-anchor without the lifted one.
                     lastX = centroidX(e, e.actionIndex); lastY = centroidY(e, e.actionIndex)
+                    lastAngle = twistAngle(e, e.actionIndex)
                 } else {
                     // Back to one finger: stop until it lifts, so the model does not jump.
                     mode = Mode.NONE
@@ -172,6 +198,28 @@ class ModelView(context: Context) : GLSurfaceView(context) {
         requestRender()
     }
 
+    private var lastAngle = 0f
+    private var twistPending = 0f
+    private var twisting = false
+
+    /** Screen angle in degrees of the line through the first two pointers, skipping [skip]. */
+    private fun twistAngle(e: MotionEvent, skip: Int): Float {
+        var a = -1; var b = -1
+        for (i in 0 until e.pointerCount) {
+            if (i == skip) continue
+            if (a < 0) a = i else if (b < 0) { b = i; break }
+        }
+        if (a < 0 || b < 0) return 0f
+        return Math.toDegrees(atan2((e.getY(b) - e.getY(a)).toDouble(), (e.getX(b) - e.getX(a)).toDouble())).toFloat()
+    }
+
+    private fun wrapDegrees(d: Float): Float {
+        var x = d
+        while (x > 180f) x -= 360f
+        while (x < -180f) x += 360f
+        return x
+    }
+
     private fun centroidX(e: MotionEvent, skip: Int): Float {
         var sum = 0f; var n = 0
         for (i in 0 until e.pointerCount) if (i != skip) { sum += e.getX(i); n++ }
@@ -184,7 +232,9 @@ class ModelView(context: Context) : GLSurfaceView(context) {
         return if (n > 0) sum / n else e.y
     }
 
-    private companion object {
+    companion object {
         const val CUBE_SIZE_DP = 96
+        private
+        const val TWIST_START_DEGREES = 10f
     }
 }

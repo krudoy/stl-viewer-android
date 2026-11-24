@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var info: TextView
     private lateinit var hint: TextView
     private lateinit var progress: ProgressBar
+    private lateinit var rollButtons: View
     private var loadJob: Job? = null
     private var currentUri: Uri? = null
 
@@ -106,6 +107,7 @@ class MainActivity : ComponentActivity() {
             result.onSuccess { mesh ->
                 currentUri = uri
                 modelView.setMesh(mesh)
+                rollButtons.visibility = View.VISIBLE
                 info.text = describe(mesh)
             }.onFailure { e ->
                 if (e is OutOfMemoryError) {
@@ -193,8 +195,40 @@ class MainActivity : ComponentActivity() {
             LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
         root.addView(topBar, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.TOP))
         // Keep the orientation cube just below the top bar and clear of side insets.
+        // 90° spin buttons, centered under the orientation cube.
+        val cubeSize = (ModelView.CUBE_SIZE_DP * dp).toInt()
+        val rollRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            visibility = View.GONE
+            val lp = { LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+                marginStart = (4 * dp).toInt(); marginEnd = (4 * dp).toInt()
+            } }
+            addView(pillButton("↺") { modelView.roll(90f) }.apply {
+                contentDescription = getString(R.string.rotate_left); minWidth = 0
+                setPadding((14 * dp).toInt(), (6 * dp).toInt(), (14 * dp).toInt(), (6 * dp).toInt())
+                textSize = 18f
+            }, lp())
+            addView(pillButton("↻") { modelView.roll(-90f) }.apply {
+                contentDescription = getString(R.string.rotate_right); minWidth = 0
+                setPadding((14 * dp).toInt(), (6 * dp).toInt(), (14 * dp).toInt(), (6 * dp).toInt())
+                textSize = 18f
+            }, lp())
+        }
+        rollButtons = rollRow
+        root.addView(rollRow, FrameLayout.LayoutParams(cubeSize + (24 * dp).toInt(), WRAP_CONTENT, Gravity.TOP or Gravity.END))
+
+        // Keep the orientation cube just below the top bar and clear of side insets.
         topBar.addOnLayoutChangeListener { v, _, _, _, bottom, _, _, _, _ ->
-            modelView.setCubeInsets(bottom, v.paddingRight - (12 * dp).toInt())
+            val rightInset = v.paddingRight - (12 * dp).toInt()
+            modelView.setCubeInsets(bottom, rightInset)
+            val lp = rollRow.layoutParams as FrameLayout.LayoutParams
+            val top = bottom + (12 * dp).toInt() + cubeSize + (4 * dp).toInt()
+            val right = rightInset // row is 24dp wider than the cube, so this centers it
+            if (lp.topMargin != top || lp.rightMargin != right) {
+                lp.topMargin = top; lp.rightMargin = right
+                rollRow.post { rollRow.layoutParams = lp }
+            }
         }
 
         info = TextView(this).apply {

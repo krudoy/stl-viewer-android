@@ -8,6 +8,7 @@ A lightweight Android app for previewing 3D model files. STL (binary and ASCII) 
 - **One finger drag** rotates the model.
 - **Pinch** zooms toward your fingers.
 - **Two finger drag** pans.
+- **Two finger twist** spins the model flat on the screen (it starts after about 10° so pinching stays steady). The ↺ ↻ buttons under the cube spin it by 90°.
 - **Double tap** or **Reset** returns to the default view.
 - **Orientation cube** (top right) turns with the model. Tap a face, edge or corner to look from that direction; faces are named Front (-Y), Back, Left, Right (+X), Top (+Z) and Bottom.
 - A mouse wheel zooms too (emulator, Chromebook, DeX).

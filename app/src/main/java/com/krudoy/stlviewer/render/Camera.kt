@@ -162,6 +162,51 @@ class Camera {
         zoom = newZoom
     }
 
+    /**
+     * Spins the model by [degrees] about the view axis (counter-clockwise when
+     * positive), around the screen point ([fx], [fy]) in view pixels so the spot
+     * between the fingers stays put.
+     */
+    @Synchronized
+    fun rollAt(degrees: Float, fx: Float, fy: Float) {
+        animating = false
+        if (degrees == 0f) return
+        Matrix.setRotateM(delta, 0, degrees, 0f, 0f, 1f)
+        Matrix.multiplyMM(tmp, 0, delta, 0, rotation, 0)
+        System.arraycopy(tmp, 0, rotation, 0, 16)
+        orthonormalize()
+        // Rotate the pan offset around the focus point too.
+        val upp = unitsPerPixel()
+        val cx = (fx - viewportWidth / 2f) * upp
+        val cy = -(fy - viewportHeight / 2f) * upp
+        val a = Math.toRadians(degrees.toDouble())
+        val c = kotlin.math.cos(a).toFloat(); val s = kotlin.math.sin(a).toFloat()
+        val px = panX - cx; val py = panY - cy
+        panX = cx + c * px - s * py
+        panY = cy + s * px + c * py
+    }
+
+    /** Animated spin about the view axis, around the screen center. */
+    @Synchronized
+    fun rollAnimated(degrees: Float) {
+        tick()
+        // Build on where a running animation is heading, so quick repeated taps
+        // land on exact multiples instead of drifting.
+        val base = FloatArray(16)
+        val bx: Float; val by: Float; val bz: Float
+        if (animating) {
+            fromQuat(toQ, base); bx = toPanX; by = toPanY; bz = toZoom
+        } else {
+            System.arraycopy(rotation, 0, base, 0, 16); bx = panX; by = panY; bz = zoom
+        }
+        val target = FloatArray(16)
+        Matrix.setRotateM(delta, 0, degrees, 0f, 0f, 1f)
+        Matrix.multiplyMM(target, 0, delta, 0, base, 0)
+        val a = Math.toRadians(degrees.toDouble())
+        val c = kotlin.math.cos(a).toFloat(); val s = kotlin.math.sin(a).toFloat()
+        animateTo(target, c * bx - s * by, s * bx + c * by, bz)
+    }
+
     /** Copies the current model rotation (no translation) into [out]. */
     @Synchronized
     fun rotationMatrix(out: FloatArray) {
