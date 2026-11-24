@@ -11,7 +11,9 @@ android {
         applicationId = "com.krudoy.stlviewer"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
+        // CI builds count up with the run number, so each new APK installs over the
+        // previous one. Local builds use 2.
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.plus(100) ?: 2
         versionName = "0.2.0"
 
         ndk {
@@ -33,6 +35,18 @@ android {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
             version = "3.22.1"
+        }
+    }
+
+    signingConfigs {
+        // A fixed, public debug key checked into the repo. Without it every CI
+        // machine signs with its own random key, and Android refuses to update
+        // the app ("App not installed"). Not for Play Store releases.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
         }
     }
 
